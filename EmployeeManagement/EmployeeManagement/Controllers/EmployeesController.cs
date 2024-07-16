@@ -7,22 +7,26 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using EmployeeManagement.Data;
 using EmployeeManagement.Models;
+using EmployeeManagement.Service;
+using Microsoft.AspNetCore.Identity;
 
 namespace EmployeeManagement.Controllers
 {
     public class EmployeesController : Controller
     {
-        private readonly ApplicationDbContext _context;
-
-        public EmployeesController(ApplicationDbContext context)
+        private readonly IEmployeeService _service;
+        
+        public EmployeesController(IEmployeeService service)
         {
-            _context = context;
+            _service = service;
+           
         }
 
         // GET: Employees
         public async Task<IActionResult> Index()
         {
-            return View(await _context.employees.ToListAsync());
+           
+            return View(await _service.Index());
         }
 
         // GET: Employees/Details/5
@@ -32,9 +36,7 @@ namespace EmployeeManagement.Controllers
             {
                 return NotFound();
             }
-
-            var employee = await _context.employees
-                .FirstOrDefaultAsync(m => m.Id == id);
+            var employee=await _service.Details(id.Value);
             if (employee == null)
             {
                 return NotFound();
@@ -54,12 +56,12 @@ namespace EmployeeManagement.Controllers
         // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create([Bind("Id,FirstName,LastName,Emial,DOB,City")] Employee employee)
-        {
-            if (ModelState.IsValid)
+        public async Task<IActionResult> Create([Bind("Id,FirstName,LastName,Email,DOB,City")] Employee employee)
+        { 
+            string? password = Request.Form["Password"];
+            if (ModelState.IsValid && password is not null)
             {
-                _context.Add(employee);
-                await _context.SaveChangesAsync();
+               await _service.Create(employee, password);
                 return RedirectToAction(nameof(Index));
             }
             return View(employee);
@@ -72,8 +74,8 @@ namespace EmployeeManagement.Controllers
             {
                 return NotFound();
             }
+            var employee=await _service.Edit(id.Value);
 
-            var employee = await _context.employees.FindAsync(id);
             if (employee == null)
             {
                 return NotFound();
@@ -97,8 +99,8 @@ namespace EmployeeManagement.Controllers
             {
                 try
                 {
-                    _context.Update(employee);
-                    await _context.SaveChangesAsync();
+                    await _service.Edit(id, employee);
+                   
                 }
                 catch (DbUpdateConcurrencyException)
                 {
@@ -123,9 +125,8 @@ namespace EmployeeManagement.Controllers
             {
                 return NotFound();
             }
-
-            var employee = await _context.employees
-                .FirstOrDefaultAsync(m => m.Id == id);
+            var employee=await _service.Delete(id.Value);
+            
             if (employee == null)
             {
                 return NotFound();
@@ -139,19 +140,14 @@ namespace EmployeeManagement.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteConfirmed(int id)
         {
-            var employee = await _context.employees.FindAsync(id);
-            if (employee != null)
-            {
-                _context.employees.Remove(employee);
-            }
-
-            await _context.SaveChangesAsync();
+            var employee = _service.DeleteConfirmed(id);
+           
             return RedirectToAction(nameof(Index));
         }
 
         private bool EmployeeExists(int id)
         {
-            return _context.employees.Any(e => e.Id == id);
+            return _service.EmployeeExists(id);
         }
     }
 }
